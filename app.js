@@ -2,19 +2,20 @@ import express from 'express'
 import session from 'express-session'
 import mongoose from 'mongoose'
 import MongoStore from 'connect-mongo'
-import { initializePassport } from './passport.config.js'
+// import { initializePassport } from './passport.config.js'
+import {passportConfigBuilder} from './passport.config.js'
 import passport from 'passport'
 
 const app = express()
 const server = app.listen(8080, () => console.log('Server Up'))
 
-const connection = mongoose.connect("mongodb://localhost:27017/back25users", {
+const connection = mongoose.connect("mongodb+srv://dcsweb:1234@dcsweb.snm3hyr.mongodb.net/?retryWrites=true&w=majority", {
     useNewUrlParser: true,
     useUnifiedTopology: true
 })
 
 let baseSession = session({
-    store: MongoStore.create({ mongoUrl: 'mongodb://localhost:27017/back25sessions'}),
+    store: MongoStore.create({ mongoUrl: 'mongodb+srv://dcsweb:1234@dcsweb.snm3hyr.mongodb.net/?retryWrites=true&w=majority'}),
     secret: 'c0d3r',
     resave: true,
     saveUninitialized: true
@@ -22,7 +23,10 @@ let baseSession = session({
 
 app.use(express.json())
 app.use(baseSession)
-initializePassport()
+passportConfigBuilder({}).GoogleoAuth({clientID:"781852376959-1rqb531406erb9hplkvcrg7rmhdjp0hb.apps.googleusercontent.com"
+    ,clientSecret:"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"
+    ,callbackURL:"http://localhost:8080/auth/google/callback"})
+    .initializePassport();
 app.use(passport.initialize())
 app.use(passport.session())
 
@@ -44,4 +48,11 @@ app.post('/failedLogin', (req, res) => {
 
 app.get('/logout', (req, res) => {
     req.logout()
+})
+app.get('/login',(req,res)=>{console.log(req.session)
+res.send({message:'Successifully logged'})
+})
+app.get('/google',passport.authenticate('google',{scope:['profile','email']}))
+app.get('/auth/google/callback',passport.authenticate('google',{failureRedirect:'/failure',successRedirect:'/login'}),(req,res)=>{
+    res.send('logueado')
 })

@@ -1,60 +1,120 @@
 import passport from 'passport'
 import local from 'passport-local'
-import { users } from './models/User.js'
-import { createHash, isValid } from './utils.js'
-
+import bcrypt from 'bcrypt'
+import mongoose, { Schema } from 'mongoose'
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 const LocalStrategy = local.Strategy
+export function passportConfigBuilder (schemaObject) {
+  let crypt = true
+  const basicSchema = {
+    username: {
+      type: String,
+      required: true,
+      unique: true
+    },
+    password: {
+      type: String,
+      required: true
+    }
+  }
+  const finalSchema = { ...schemaObject, ...basicSchema }
+  function setCrypt (value) {
+    crypt = value
+    return this
+  }
+  const createHash = password => bcrypt.hashSync(password, bcrypt.genSaltSync(10))
+  const isValid = (user, password) => bcrypt.compareSync(password, user.password)
 
-export const initializePassport = () => {
+  const users = mongoose.model('users', new Schema(finalSchema))
+  function initializePassport () {
     passport.use(
-        'register',
-        new LocalStrategy(
-            { passReqToCallback: true },
-            async (req, username, password, done) => {
-                try {
-                    let user = await users.findOne({ username })
-                    if (user) return done(null, false) //error, data
-                    const newUser = {
-                        username,
-                        password: createHash(password),
-                        email: req.body.email,
-                        first_name: req.body.first_name,
-                        last_name: req.body.last_name,
-                        address: req.body.address,
-                        age: req.body.age
-                    }
-                    try {
-                        let result = await users.create(newUser)
-                        return done(null, result)
-                    } catch(err) { 
-                        done(err)
-                    }
-                } catch(err) {
-                    done(err)
-                }
+      'register',
+      new LocalStrategy(
+        { passReqToCallback: true },
+        async (req, username, password, done) => {
+          try {
+            const user = await users.findOne({ username })
+            if (user) return done(null, false) // error, data
+            let newUser = { username, password }
+            if (crypt) newUser = { username, password: createHash(password) }
+            Object.keys(schemaObject).forEach(key => {
+              newUser = { ...newUser, [key]: req.body[key] }
             })
-        )
+            try {
+              const result = await users.create(newUser)
+              return done(null, result)
+            } catch (err) {
+              done(err)
+            }
+          } catch (err) {
+            done(err)
+          }
+        })
+    )
 
-        passport.serializeUser((user, done) => {
-            done(null, user._id)
-        })
-        passport.deserializeUser((id, done) => {
-            users.findById(id, done)
-        })
+    passport.serializeUser((user, done) => {
+      done(null, user._id)
+    })
+    passport.deserializeUser((id, done) => {
+      users.findById(id, done)
+    })
 
     passport.use(
-        'login',
-        new LocalStrategy(
-            async(username, password, done) => {
-                try {
-                    let user = await users.findOne({ username })
-                    if (!user) return done(null, false)
-                    if (!isValid(user, password)) return done(null, false)
-                    return done(null, user)
-                } catch(err) {
-                    done(err)
-                }
-            }
-        )
+      'login',
+      new LocalStrategy(
+        async (username, password, done) => {
+          try {
+            const user = await users.findOne({ username })
+            if (!user) return done(null, false)
+            if (!isValid(user, password)) return done(null, false)
+            return done(null, user)
+          } catch (err) {
+            done(err)
+          }
+        }
+      )
     )
+    return this
+  }
+  function GoogleoAuth (authObject) {
+    const googleAuthSchema = new Schema({
+      username:{
+        type: String,
+        required: true,
+        unique: true
+      },
+      name:String,
+      lastName:String,
+      avatar:String
+    })
+    const googleAuthModel= mongoose.model('usersGoogleAuthModel',googleAuthSchema)
+    passport.use(new GoogleStrategy({
+        clientID: authObject.clientID,
+        clientSecret: authObject.clientSecret,
+        callbackURL: authObject.callbackURL
+
+      },
+      async function(accessToken, refreshToken, profile,email, cb) {
+        console.log(email)
+        const resultado = await googleAuthModel.findOne({username:email.emails[0].value})
+        if (resultado) {
+          console.log("user fund")
+          return cb(null,resultado)}
+        const usercreated =await googleAuthModel.create({username:email.emails[0].value,password:email.id,name:email.name.givenName,lastname:email.name.familyName,avatar:email.photos[0].value})
+        console.log("********************")
+        console.log(await usercreated)
+        return cb(null, resultado);
+        // });
+      }
+    ));
+    passport.serializeUser((user, done) => {
+      done(null, user._id)
+    })
+    passport.deserializeUser((id, done) => {
+      googleAuthModel.findById(id, done)
+    })
+    return this
+  }
+  return { initializePassport, setCrypt, GoogleoAuth }
 }
+export default passportConfigBuilder
