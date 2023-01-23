@@ -2,7 +2,7 @@ import passport from 'passport'
 import local from 'passport-local'
 import bcrypt from 'bcrypt'
 import mongoose, { Schema } from 'mongoose'
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20'
 const LocalStrategy = local.Strategy
 export function passportConfigBuilder (schemaObject) {
   let crypt = true
@@ -76,37 +76,49 @@ export function passportConfigBuilder (schemaObject) {
     )
     return this
   }
-  function GoogleoAuth (authObject) {
-    const googleAuthSchema = new Schema({
-      username:{
-        type: String,
-        required: true,
-        unique: true
-      },
-      name:String,
-      lastName:String,
-      avatar:String
-    })
-    const googleAuthModel= mongoose.model('usersGoogleAuthModel',googleAuthSchema)
-    passport.use(new GoogleStrategy({
-        clientID: authObject.clientID,
-        clientSecret: authObject.clientSecret,
-        callbackURL: authObject.callbackURL
+  function GoogleoAuth (authObject, loginOnly = false) {
+    let googleAuthModel
 
-      },
-      async function(accessToken, refreshToken, profile,email, cb) {
-        console.log(email)
-        const resultado = await googleAuthModel.findOne({username:email.emails[0].value})
+    const justLogin = async (accessToken, refreshToken, profile, email, cb) => {
+      console.log(profile, email)
+      try {
+        googleAuthModel = users
+        const resultado = await googleAuthModel.findOne({ username: email.emails[0].value })
         if (resultado) {
-          console.log("user fund")
-          return cb(null,resultado)}
-        const usercreated =await googleAuthModel.create({username:email.emails[0].value,password:email.id,name:email.name.givenName,lastname:email.name.familyName,avatar:email.photos[0].value})
-        console.log("********************")
-        console.log(await usercreated)
-        return cb(null, resultado);
-        // });
-      }
-    ));
+          console.log('encontrado')
+          return cb(null, resultado)
+        }console.log('siguio')
+      //  return cb(new Error('User not found'), false)
+      } catch (err) { return cb(err) }
+    }
+    const loginAndregister = async (accessToken, refreshToken, profile, email, cb) => {
+      const googleAuthSchema = new Schema({
+        username: {
+          type: String,
+          required: true,
+          unique: true
+        },
+        name: String,
+        lastName: String,
+        avatar: String
+      })
+      googleAuthModel = mongoose.model('usersGoogleAuthModel', googleAuthSchema)
+      console.log(profile)
+      try {
+        const resultado = await googleAuthModel.findOne({ username: email.emails[0].value })
+        if (resultado) {
+          console.log('encontrado')
+          return cb(null, resultado)
+        }console.log('siguio')
+        try {
+          const usercreated = await googleAuthModel.create({ username: email.emails[0].value, password: email.id, name: email.name.givenName, lastname: email.name.familyName, avatar: email.photos[0].value })
+          console.log(await usercreated)
+          return cb(null, usercreated)
+        } catch (err) { return cb(err) }
+      } catch (err) { return cb(err) }
+    }
+    passport.use(new GoogleStrategy(authObject,
+      (loginOnly) ? justLogin : loginAndregister))
     passport.serializeUser((user, done) => {
       done(null, user._id)
     })
