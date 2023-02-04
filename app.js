@@ -3,9 +3,9 @@ import session from 'express-session'
 import mongoose from 'mongoose'
 import MongoStore from 'connect-mongo'
 // import { initializePassport } from './passport.config.js'
-import { passportConfigBuilder } from './passport.config.js'
+import  passportConfigBuilder  from './passportconfig.cjs'
 import passport from 'passport'
-
+console.log(passportConfigBuilder)
 const app = express()
 app.listen(8080, () => console.log('Server Up'))
 mongoose.set('strictQuery', true)
@@ -23,12 +23,12 @@ const baseSession = session({
 
 app.use(express.json())
 app.use(baseSession)
-passportConfigBuilder({}).GoogleoAuth({
+passportConfigBuilder(mongoose.Schema({})).GoogleoAuth({
   clientID: '781852376959-1rqb531406erb9hplkvcrg7rmhdjp0hb.apps.googleusercontent.com',
   clientSecret: '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',
   callbackURL: 'http://localhost:8080/auth/google/callback'
 }, true)
-  .initializePassport()
+  .buildLocalConfig()
 app.use(passport.initialize())
 app.use(passport.session())
 
