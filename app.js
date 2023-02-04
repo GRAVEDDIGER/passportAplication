@@ -9,13 +9,13 @@ console.log(passportConfigBuilder)
 const app = express()
 app.listen(8080, () => console.log('Server Up'))
 mongoose.set('strictQuery', true)
-mongoose.connect('mongodb+srv://dcsweb:1234@dcsweb.snm3hyr.mongodb.net/?retryWrites=true&w=majority', {
+mongoose.connect('mongodb+srv://dcsweb:MopG23GHLEu3GwB0@dcsweb.snm3hyr.mongodb.net/?retryWrites=true&w=majority', {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
 
 const baseSession = session({
-  store: MongoStore.create({ mongoUrl: 'mongodb+srv://dcsweb:1234@dcsweb.snm3hyr.mongodb.net/?retryWrites=true&w=majority' }),
+  store: MongoStore.create({ mongoUrl: 'mongodb+srv://dcsweb:MopG23GHLEu3GwB0@dcsweb.snm3hyr.mongodb.net/?retryWrites=true&w=majority' }),
   secret: 'c0d3r',
   resave: true,
   saveUninitialized: true
@@ -52,10 +52,13 @@ app.get('/logout', (req, res) => {
   req.logout()
 })
 app.get('/login', (req, res) => {
-  console.log(req.session)
-  res.send({ message: 'Successifully logged', session: req.session.passport })
+  req.session.reload((some)=>{
+    console.log(req.session)
+    res.send({ message: 'Successifully logged', session: req.session.passport })
+
+  })
 })
-app.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }))
+app.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }),)
 app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/failure', successRedirect: '/login' }), (req, res) => {
   res.send('logueado')
 })
